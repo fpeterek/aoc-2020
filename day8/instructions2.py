@@ -1,6 +1,6 @@
 from enum import Enum
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional, List
 
 
 class InstructionType(Enum):
@@ -14,6 +14,16 @@ class Instruction:
     ins_type: InstructionType
     arg: int
     call_count: int = 0
+
+
+@dataclass
+class State:
+    loop: bool
+    state: int
+
+    @property
+    def terminated(self) -> bool:
+        return not self.loop
 
 
 class Interpreter:
@@ -33,12 +43,34 @@ class Interpreter:
             raise ValueError(f'Unknown instruction {instruction.ins_type}')
 
     def run(self, code: List[Instruction]) -> int:
-        while code[self.i].call_count < 1:
+        loop = False
+        while self.i < len(code):
+            if code[self.i].call_count >= 1:
+                loop = True
+                break
             curr = code[self.i]
             self.interpret(curr)
             curr.call_count += 1
 
-        return self.acc
+        return State(loop, self.acc)
+
+
+class Optimizer:
+    def __init__(self, code: List[Instruction]):
+        self.code = code
+        self.fixable: List[int] = list()
+        for idx, ins in enumerate(code):
+            if (ins.ins_type == InstructionType.NOP and ins.arg) or ins.ins_type == InstructionType.JMP:
+                self.fixable.append(idx)
+
+    def next(self) -> List[Instruction]:
+        copy = [Instruction(ins.ins_type, ins.arg) for ins in self.code]
+        old = copy[self.fixable[0]]
+        new_type = InstructionType.NOP if old.ins_type == InstructionType.JMP else InstructionType.JMP
+        new = Instruction(new_type, old.arg)
+        copy[self.fixable[0]] = new
+        self.fixable.pop(0)
+        return copy
 
 
 def parse_line(line: str) -> Instruction:
@@ -54,8 +86,13 @@ def load_file(filename: str) -> List[Instruction]:
 
 
 if __name__ == '__main__':
-    interpreter = Interpreter()
     instructions = load_file('in.txt')
-    retval = interpreter.run(instructions)
-    print(retval)
+    optimizer = Optimizer(instructions)
+    while True:
+        interpreter = Interpreter()
+        code = optimizer.next()
+        retval = interpreter.run(code)
+        if retval.terminated:
+            print(retval.state)
+            break
 
