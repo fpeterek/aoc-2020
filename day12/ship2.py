@@ -79,18 +79,20 @@ class Waypoint:
 
         self.pos += (dx, dy)
 
+    @property
+    def distance(self) -> float:
+        return (self.pos.x**2 + self.pos.y**2) ** 0.5
+
     def turn(self, deg: int) -> None:
-        if deg == 180:
-            self.pos.x *= -1
-            self.pos.y *= -1
-        elif deg == 270:
-            self.turn(180)
-            self.turn(90)
-        elif deg == 90:
-            if (self.pos.x > 0 and self.pos.y > 0) or (self.pos.x < 0 and self.pos.y < 0):
-                self.pos.x *= -1
-            if (self.pos.x < 0 and self.pos.y > 0) or (self.pos.x > 0 and self.pos.y < 0):
-                self.pos.y *= -1
+        dist = self.distance
+        if not dist:
+            return
+        cos = self.pos.x / dist
+        angle = math.acos(cos)
+        angle = angle if self.pos.y >= 0 else (math.pi*2)-angle
+        angle += math.radians(deg)
+        nx, ny = round(math.cos(angle) * dist), round(math.sin(angle) * dist)
+        self.pos.x, self.pos.y = nx, ny
 
     def apply(self, ins: Instruction) -> None:
         if ins.type == InstructionType.Move:
